@@ -1,0 +1,50 @@
+step "deploy-tanented-helm-chart" {
+    name = "Deploy Tanented Helm Chart "
+    properties = {
+        Octopus.Action.TargetRoles = "merchants-k8s"
+    }
+
+    action {
+        action_type = "Octopus.HelmChartUpgrade"
+        properties = {
+            Octopus.Action.GitRepository.Source = "External"
+            Octopus.Action.Helm.ChartDirectory = "charts/merchant-portal/"
+            Octopus.Action.Helm.Namespace = "#{Namespace}"
+            Octopus.Action.Helm.ReleaseName = "merchant-portal-#{Octopus.Deployment.Tenant.Name | ToLower | Replace \" \" \"-\"}"
+            Octopus.Action.Helm.ResetValues = "True"
+            Octopus.Action.Helm.TemplateValuesSources = <<-EOT
+                [
+                  {
+                    "Type": "InlineYaml",
+                    "Value": "env:\n  BRAND_COLOR: \"#{BrandColor}\"\n  DATA_REGION: \"#{DataRegion}\""
+                  },
+                  {
+                    "Type": "GitRepository",
+                    "GitRepositorySource": "External",
+                    "GitDependencyName": "TemplateValues-1",
+                    "ValuesFilePaths": "charts/merchant-portal/values.yaml\ncharts/merchant-portal/values-#{Octopus.Environment.Name | toLower}.yaml"
+                  }
+                ]
+                EOT
+            Octopus.Action.Kubernetes.ResourceStatusCheck = "True"
+            Octopus.Action.Script.ScriptSource = "GitRepository"
+        }
+        tenant_tags = ["Hosting/Shared-K8s"]
+        worker_pool = "hosted-windows"
+        worker_pool_variable = ""
+
+        git_dependencies {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-1"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/kim-codefresh/finpay-deploy.git"
+        }
+
+        git_dependencies "TemplateValues-1" {
+            default_branch = "main"
+            git_credential_id = "GitCredentials-1"
+            git_credential_type = "Library"
+            repository_uri = "https://github.com/kim-codefresh/finpay-deploy.git"
+        }
+    }
+}
